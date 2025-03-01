@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 
 // API base URL - change this to point to your Flask backend
@@ -224,13 +223,14 @@ export const fetchDashboardStats = (filters = {}): Promise<DashboardStats> => {
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);
     toast.error('Failed to load dashboard statistics');
-    return {
+    // Return a promise that resolves to the default stats object
+    return Promise.resolve({
       totalRecords: 0,
       avgIntensity: 0,
       topLikelihood: 0,
       topicCount: 0,
       countryCount: 0
-    };
+    });
   }
 };
 

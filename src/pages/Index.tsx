@@ -1,8 +1,8 @@
 
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import { TopicChart } from "../components/charts/TopicChart";
-import { YearTrendsChart } from "../components/charts/YearTrendsChart";
+import TopicChart from "../components/charts/TopicChart";
+import YearTrendsChart from "../components/charts/YearTrendsChart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Filter, Gauge, BarChart3, TrendingUp, Database, Globe, Activity } from "lucide-react";
