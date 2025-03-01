@@ -119,3 +119,17 @@
   opacity: 0;
   transition: opacity 0.2s ease-in-out;
 }
+
+/* Grid styles for D3 charts */
+.grid line {
+  @apply stroke-gray-200;
+}
+
+.grid path {
+  @apply stroke-none;
+}
+
+/* Bar hover effects */
+.bar:hover {
+  @apply cursor-pointer;
+}

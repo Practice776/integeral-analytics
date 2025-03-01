@@ -6,12 +6,12 @@ const API_BASE_URL = 'http://localhost:5000/api';
 
 // Types for our data
 export interface IntensityData {
-  intensity: number;
+  intensity: number | string;
   count: number;
 }
 
 export interface LikelihoodData {
-  likelihood: number;
+  likelihood: number | string;
   count: number;
 }
 
@@ -77,6 +77,7 @@ const buildUrl = (endpoint: string, filters: FilterParams = {}) => {
     }
   });
   
+  console.log(`Calling API: ${url.toString()}`);
   return url.toString();
 };
 
@@ -90,6 +91,7 @@ const handleApiError = (error: unknown, endpoint: string) => {
 // Function to fetch data with proper error handling
 const fetchData = async <T>(endpoint: string, filters: FilterParams = {}): Promise<T> => {
   try {
+    console.log(`Fetching ${endpoint} with filters:`, filters);
     const response = await fetch(buildUrl(endpoint, filters), {
       headers: {
         'Accept': 'application/json',
@@ -103,21 +105,28 @@ const fetchData = async <T>(endpoint: string, filters: FilterParams = {}): Promi
       throw new Error(`Server returned ${response.status}: ${response.statusText}`);
     }
     
-    return await response.json() as T;
+    const data = await response.json() as T;
+    console.log(`Data received for ${endpoint}:`, data);
+    return data;
   } catch (error) {
     console.error(`Error fetching ${endpoint}:`, error);
     
     // For demonstration purposes, return mock data when backend is not available
     console.warn(`Returning mock data for ${endpoint} due to connection error`);
-    return getMockData(endpoint) as T;
+    return getMockData(endpoint, filters) as T;
   }
 };
 
 // Mock data function for development when backend is not available
-function getMockData(endpoint: string) {
+function getMockData(endpoint: string, filters: FilterParams = {}) {
+  console.log('Using mock data with filters:', filters);
+  
+  // Base mock data
+  let mockData;
+  
   switch (endpoint) {
     case 'topic-distribution':
-      return [
+      mockData = [
         { name: 'oil', value: 25 },
         { name: 'gas', value: 18 },
         { name: 'market', value: 15 },
@@ -129,8 +138,9 @@ function getMockData(endpoint: string) {
         { name: 'climate', value: 5 },
         { name: 'economic growth', value: 4 }
       ];
+      break;
     case 'year-trend':
-      return [
+      mockData = [
         { year: 2016, avgIntensity: 3.5, avgLikelihood: 2.1, avgRelevance: 2.8 },
         { year: 2017, avgIntensity: 4.2, avgLikelihood: 2.3, avgRelevance: 3.0 },
         { year: 2018, avgIntensity: 4.8, avgLikelihood: 2.5, avgRelevance: 3.2 },
@@ -141,8 +151,9 @@ function getMockData(endpoint: string) {
         { year: 2023, avgIntensity: 6.2, avgLikelihood: 3.2, avgRelevance: 3.8 },
         { year: 2024, avgIntensity: 6.5, avgLikelihood: 3.3, avgRelevance: 3.9 },
       ];
+      break;
     case 'intensity-distribution':
-      return [
+      mockData = [
         { intensity: 1, count: 5 },
         { intensity: 2, count: 12 },
         { intensity: 3, count: 18 },
@@ -154,15 +165,17 @@ function getMockData(endpoint: string) {
         { intensity: 9, count: 2 },
         { intensity: 10, count: 1 },
       ];
+      break;
     case 'likelihood-distribution':
-      return [
+      mockData = [
         { likelihood: 1, count: 7 },
         { likelihood: 2, count: 15 },
         { likelihood: 3, count: 25 },
         { likelihood: 4, count: 18 },
       ];
+      break;
     case 'region-distribution':
-      return [
+      mockData = [
         { name: 'Northern America', value: 35 },
         { name: 'Asia', value: 30 },
         { name: 'Western Europe', value: 25 },
@@ -173,8 +186,9 @@ function getMockData(endpoint: string) {
         { name: 'Central America', value: 5 },
         { name: 'World', value: 10 }
       ];
+      break;
     case 'sector-distribution':
-      return [
+      mockData = [
         { name: 'Energy', value: 30 },
         { name: 'Environment', value: 25 },
         { name: 'Government', value: 20 },
@@ -183,8 +197,9 @@ function getMockData(endpoint: string) {
         { name: 'Financial services', value: 8 },
         { name: 'Healthcare', value: 7 }
       ];
+      break;
     case 'country-distribution':
-      return [
+      mockData = [
         { country: 'United States', count: 28 },
         { country: 'China', count: 22 },
         { country: 'Russia', count: 17 },
@@ -196,9 +211,56 @@ function getMockData(endpoint: string) {
         { country: 'France', count: 6 },
         { country: 'Canada', count: 5 }
       ];
+      break;
     default:
-      return [];
+      mockData = [];
   }
+  
+  // Apply filters to mock data (simple simulation of backend filtering)
+  if (Object.keys(filters).length > 0) {
+    // This is a simplified mock filtering - in real data this would be handled by the backend
+    if (filters.sector && mockData.length > 0 && 'name' in mockData[0]) {
+      // Reduce counts for non-matching sectors
+      mockData = mockData.map(item => {
+        if ('name' in item && item.name.toLowerCase() !== filters.sector?.toLowerCase()) {
+          return { ...item, value: Math.floor(item.value * 0.5) };
+        }
+        return item;
+      });
+    }
+    
+    if (filters.country && mockData.length > 0 && 'country' in mockData[0]) {
+      // Reduce counts for non-matching countries
+      mockData = mockData.map(item => {
+        if (item.country.toLowerCase() !== filters.country?.toLowerCase()) {
+          return { ...item, count: Math.floor(item.count * 0.6) };
+        }
+        return item;
+      });
+    }
+    
+    // Simulate filtering effect on topic distribution
+    if (filters.topic && endpoint === 'topic-distribution') {
+      mockData = mockData.map(item => {
+        if (item.name.toLowerCase() !== filters.topic?.toLowerCase()) {
+          return { ...item, value: Math.floor(item.value * 0.4) };
+        }
+        return item;
+      });
+    }
+    
+    // Simulate filtering on region
+    if (filters.region && endpoint === 'region-distribution') {
+      mockData = mockData.map(item => {
+        if (item.name.toLowerCase() !== filters.region?.toLowerCase()) {
+          return { ...item, value: Math.floor(item.value * 0.3) };
+        }
+        return item;
+      });
+    }
+  }
+  
+  return mockData;
 }
 
 // API functions for each endpoint

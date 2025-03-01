@@ -30,6 +30,12 @@ const IntensityChart: React.FC<IntensityChartProps> = ({ data, height = 300 }) =
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
+    // Create a color scale based on intensity values
+    const colorScale = d3
+      .scaleSequential()
+      .domain([0, d3.max(data, d => d.intensity) || 10])
+      .interpolator(d3.interpolateBlues);
+
     // X scale
     const x = d3
       .scaleBand()
@@ -76,6 +82,16 @@ const IntensityChart: React.FC<IntensityChartProps> = ({ data, height = 300 }) =
       .attr('fill', 'currentColor')
       .attr('font-size', '0.75rem');
 
+    // Add grid lines
+    svg
+      .append('g')
+      .attr('class', 'grid')
+      .call(
+        d3.axisLeft(y)
+          .tickSize(-width)
+          .tickFormat(() => '')
+      );
+
     // Create tooltip
     const tooltip = d3
       .select('body')
@@ -95,24 +111,69 @@ const IntensityChart: React.FC<IntensityChartProps> = ({ data, height = 300 }) =
       .attr('width', x.bandwidth())
       .attr('y', chartHeight)
       .attr('height', 0)
-      .attr('fill', '#228be6')
+      .attr('fill', d => colorScale(+d.intensity))
+      .attr('rx', 2) // Rounded corners
+      .attr('ry', 2)
       .on('mouseover', (event, d) => {
+        // Highlight the bar
+        d3.select(event.currentTarget)
+          .transition()
+          .duration(200)
+          .attr('opacity', 0.8)
+          .attr('stroke', '#000')
+          .attr('stroke-width', 1);
+        
         tooltip
-          .style('opacity', 1)
-          .html(`<div class="p-2">
+          .transition()
+          .duration(200)
+          .style('opacity', 1);
+          
+        tooltip
+          .html(`<div class="p-2 bg-white rounded shadow-md">
                   <div class="font-medium">Intensity: ${d.intensity}</div>
                   <div>Count: ${d.count}</div>
                 </div>`)
           .style('left', `${event.pageX + 10}px`)
           .style('top', `${event.pageY - 28}px`);
       })
-      .on('mouseout', () => {
-        tooltip.style('opacity', 0);
+      .on('mouseout', (event) => {
+        // Restore bar appearance
+        d3.select(event.currentTarget)
+          .transition()
+          .duration(200)
+          .attr('opacity', 1)
+          .attr('stroke', 'none');
+          
+        tooltip
+          .transition()
+          .duration(500)
+          .style('opacity', 0);
       })
       .transition()
       .duration(800)
+      .delay((d, i) => i * 50)
       .attr('y', d => y(d.count))
       .attr('height', d => chartHeight - y(d.count));
+
+    // Add labels on top of bars for significant values
+    svg
+      .selectAll('.bar-label')
+      .data(data.filter(d => d.count > d3.max(data, d => d.count)! * 0.5)) // Only label significant bars
+      .enter()
+      .append('text')
+      .attr('class', 'bar-label')
+      .attr('x', d => (x(d.intensity.toString()) as number) + x.bandwidth() / 2)
+      .attr('y', d => y(d.count) - 5)
+      .attr('text-anchor', 'middle')
+      .attr('fill', 'currentColor')
+      .attr('font-size', '0.75rem')
+      .attr('font-weight', 'bold')
+      .attr('opacity', 0)
+      .text(d => d.count)
+      .transition()
+      .duration(800)
+      .delay((d, i) => i * 50 + 400)
+      .attr('opacity', 1);
 
     // Clean up function
     return () => {

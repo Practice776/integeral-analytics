@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import TopicChart from "../components/charts/TopicChart";
@@ -8,9 +9,10 @@ import RegionDonutChart from "../components/charts/RegionDonutChart";
 import SectorPieChart from "../components/charts/SectorPieChart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Filter, Gauge, BarChart3, TrendingUp, Database, Globe, Activity } from "lucide-react";
+import { Filter, Gauge, BarChart3, TrendingUp, Database, Globe, Activity, RefreshCw } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Import API service
 import {
@@ -27,7 +29,8 @@ import {
   LikelihoodData,
   RegionData,
   SectorData,
-  CountryData
+  CountryData,
+  FilterParams
 } from "../services/api";
 
 const Index = () => {
@@ -40,6 +43,8 @@ const Index = () => {
   const [regionData, setRegionData] = useState<RegionData[]>([]);
   const [sectorData, setSectorData] = useState<SectorData[]>([]);
   const [countryData, setCountryData] = useState<CountryData[]>([]);
+  
+  // Filter states
   const [endYearFilter, setEndYearFilter] = useState("");
   const [topicFilter, setTopicFilter] = useState("");
   const [sectorFilter, setSectorFilter] = useState("");
@@ -48,7 +53,9 @@ const Index = () => {
   const [sourceFilter, setSourceFilter] = useState("");
   const [swotFilter, setSwotFilter] = useState("");
   const [countryFilter, setCountryFilter] = useState("");
+  
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
   useEffect(() => {
     // Function to handle window resize
@@ -65,12 +72,41 @@ const Index = () => {
     };
   }, []);
 
+  // Update active filters display
   useEffect(() => {
+    const filters: string[] = [];
+    if (endYearFilter) filters.push(`End Year: ${endYearFilter}`);
+    if (topicFilter) filters.push(`Topic: ${topicFilter}`);
+    if (sectorFilter) filters.push(`Sector: ${sectorFilter}`);
+    if (regionFilter) filters.push(`Region: ${regionFilter}`);
+    if (pestleFilter) filters.push(`PESTLE: ${pestleFilter}`);
+    if (sourceFilter) filters.push(`Source: ${sourceFilter}`);
+    if (swotFilter) filters.push(`SWOT: ${swotFilter}`);
+    if (countryFilter) filters.push(`Country: ${countryFilter}`);
+    
+    setActiveFilters(filters);
+  }, [
+    endYearFilter,
+    topicFilter,
+    sectorFilter,
+    regionFilter,
+    pestleFilter,
+    sourceFilter,
+    swotFilter,
+    countryFilter
+  ]);
+
+  // Fetch data with filters
+  useEffect(() => {
+    let isMounted = true;
+    
     async function loadData() {
+      if (!isMounted) return;
+      
       setIsLoading(true);
       try {
         // Using filters object to pass to API functions
-        const filters = {
+        const filters: FilterParams = {
           end_year: endYearFilter,
           topic: topicFilter,
           sector: sectorFilter,
@@ -81,7 +117,9 @@ const Index = () => {
           country: countryFilter
         };
 
-        // Fetch all data
+        console.log("Applying filters:", filters);
+
+        // Fetch all data with the filters applied
         const [topics, yearTrends, intensities, likelihoods, regions, sectors, countries] = await Promise.all([
           fetchTopicDistribution(filters),
           fetchYearTrends(filters),
@@ -92,6 +130,8 @@ const Index = () => {
           fetchCountryDistribution(filters)
         ]);
 
+        if (!isMounted) return;
+
         // Set state with fetched data
         setTopicData(topics);
         setYearTrendData(yearTrends);
@@ -100,20 +140,37 @@ const Index = () => {
         setRegionData(regions);
         setSectorData(sectors);
         setCountryData(countries);
+        
+        // Show success toast when filters are applied
+        if (Object.values(filters).some(f => f)) {
+          toast({
+            title: "Filters Applied",
+            description: "Dashboard data has been filtered successfully.",
+          });
+        }
       } catch (error) {
         console.error("Error loading dashboard data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load dashboard data. Please try again.",
-          variant: "destructive"
-        });
+        if (isMounted) {
+          toast({
+            title: "Error",
+            description: "Failed to load dashboard data. Please try again.",
+            variant: "destructive"
+          });
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     }
 
     loadData();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [
+    // Dependencies for filters
     endYearFilter,
     topicFilter,
     sectorFilter,
@@ -126,9 +183,11 @@ const Index = () => {
   ]);
 
   const handleApplyFilters = () => {
-    // Trigger refetch by forcing a re-render
-    setIsLoading(true);
-    // The useEffect will handle the data fetching
+    // The useEffect will handle data fetching because the filter state variables are dependencies
+    toast({
+      title: "Applying filters...",
+      description: "Updating dashboard data with the selected filters.",
+    });
   };
 
   const handleClearFilters = () => {
@@ -140,6 +199,11 @@ const Index = () => {
     setSourceFilter("");
     setSwotFilter("");
     setCountryFilter("");
+    
+    toast({
+      title: "Filters Cleared",
+      description: "All filters have been reset.",
+    });
   };
 
   return (
@@ -151,13 +215,25 @@ const Index = () => {
             <Database className="h-6 w-6 text-blue-600" />
             <h1 className="text-xl font-bold text-gray-900">Data Visualization Dashboard</h1>
           </div>
-          <div className="flex items-center">
-            {!isMobile && (
-              <Button variant="outline" size="sm" className="flex items-center">
-                <Filter className="h-4 w-4 mr-2" />
-                {!isLoading ? "Filters" : "Loading..."}
-              </Button>
+          <div className="flex items-center space-x-2">
+            {!isMobile && activeFilters.length > 0 && (
+              <div className="text-sm text-gray-500 mr-2">
+                <span className="font-medium">Active filters:</span> {activeFilters.length}
+              </div>
             )}
+            <Button variant="outline" size="sm" className="flex items-center" onClick={handleApplyFilters} disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filters
+                </>
+              )}
+            </Button>
           </div>
         </div>
       </header>
@@ -239,8 +315,19 @@ const Index = () => {
                 />
               </div>
             </div>
+            
+            {activeFilters.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {activeFilters.map((filter, index) => (
+                  <div key={index} className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-1 rounded">
+                    {filter}
+                  </div>
+                ))}
+              </div>
+            )}
+            
             <div className="flex justify-end mt-4 space-x-2">
-              <Button variant="outline" onClick={handleClearFilters}>
+              <Button variant="outline" onClick={handleClearFilters} disabled={isLoading || activeFilters.length === 0}>
                 Clear Filters
               </Button>
               <Button onClick={handleApplyFilters} disabled={isLoading}>
@@ -251,8 +338,40 @@ const Index = () => {
         </Card>
 
         {isLoading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="overflow-hidden">
+                <CardHeader className="pb-2">
+                  <Skeleton className="h-6 w-48" />
+                  <Skeleton className="h-4 w-36 mt-1" />
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[400px] flex items-center justify-center">
+                    <div className="animate-pulse space-y-4">
+                      <div className="h-4 bg-gray-200 rounded w-48"></div>
+                      <div className="h-4 bg-gray-200 rounded w-36"></div>
+                      <div className="h-4 bg-gray-200 rounded w-60"></div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="overflow-hidden">
+                <CardHeader className="pb-2">
+                  <Skeleton className="h-6 w-48" />
+                  <Skeleton className="h-4 w-36 mt-1" />
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[400px] flex items-center justify-center">
+                    <div className="animate-pulse space-y-4">
+                      <div className="h-4 bg-gray-200 rounded w-48"></div>
+                      <div className="h-4 bg-gray-200 rounded w-36"></div>
+                      <div className="h-4 bg-gray-200 rounded w-60"></div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         ) : (
           <>
@@ -269,7 +388,13 @@ const Index = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="h-[400px]">
-                    <TopicChart data={topicData} height={400} />
+                    {topicData.length > 0 ? (
+                      <TopicChart data={topicData} height={400} />
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-gray-400">
+                        No topic data available with current filters
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -285,7 +410,13 @@ const Index = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="h-[400px]">
-                    <YearTrendsChart data={yearTrendData} height={400} />
+                    {yearTrendData.length > 0 ? (
+                      <YearTrendsChart data={yearTrendData} height={400} />
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-gray-400">
+                        No year trend data available with current filters
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -311,7 +442,13 @@ const Index = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="h-[350px]">
-                      <IntensityChart data={intensityData} height={350} />
+                      {intensityData.length > 0 ? (
+                        <IntensityChart data={intensityData} height={350} />
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-gray-400">
+                          No intensity data available with current filters
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -328,7 +465,13 @@ const Index = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="h-[350px]">
-                      <LikelihoodChart data={likelihoodData} height={350} />
+                      {likelihoodData.length > 0 ? (
+                        <LikelihoodChart data={likelihoodData} height={350} />
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-gray-400">
+                          No likelihood data available with current filters
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -345,7 +488,13 @@ const Index = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="h-[350px]">
-                      <RegionDonutChart data={regionData} height={350} />
+                      {regionData.length > 0 ? (
+                        <RegionDonutChart data={regionData} height={350} />
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-gray-400">
+                          No region data available with current filters
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -362,7 +511,13 @@ const Index = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="h-[350px]">
-                      <SectorPieChart data={sectorData} height={350} />
+                      {sectorData.length > 0 ? (
+                        <SectorPieChart data={sectorData} height={350} />
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-gray-400">
+                          No sector data available with current filters
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -399,8 +554,8 @@ const Index = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {intensityData.length > 0 
-                      ? Math.max(...intensityData.map(d => d.intensity)) 
+                    {intensityData.length > 0 && intensityData.some(d => d.intensity !== "") 
+                      ? Math.max(...intensityData.filter(d => d.intensity !== "").map(d => +d.intensity)) 
                       : "N/A"}
                   </div>
                 </CardContent>
@@ -416,6 +571,30 @@ const Index = () => {
               </Card>
             </div>
           </>
+        )}
+        
+        {/* Active Filters Summary */}
+        {activeFilters.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center">
+                <Filter className="h-4 w-4 mr-2 text-blue-600" />
+                Active Filters
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {activeFilters.map((filter, index) => (
+                  <div key={index} className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-1 rounded">
+                    {filter}
+                  </div>
+                ))}
+                <Button variant="outline" size="sm" onClick={handleClearFilters} className="text-xs h-6">
+                  Clear All
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         )}
         
         {/* Footer */}
