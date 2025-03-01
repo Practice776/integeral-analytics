@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 
 // API base URL - point to your Flask backend
@@ -139,6 +138,7 @@ function getMockData(endpoint: string, filters: FilterParams = {}) {
         { name: 'economic growth', value: 4 }
       ];
       break;
+    
     case 'year-trend':
       mockData = [
         { year: 2016, avgIntensity: 3.5, avgLikelihood: 2.1, avgRelevance: 2.8 },
@@ -219,44 +219,60 @@ function getMockData(endpoint: string, filters: FilterParams = {}) {
   // Apply filters to mock data (simple simulation of backend filtering)
   if (Object.keys(filters).length > 0) {
     // This is a simplified mock filtering - in real data this would be handled by the backend
-    if (filters.sector && mockData.length > 0 && 'name' in mockData[0]) {
-      // Reduce counts for non-matching sectors
-      mockData = mockData.map(item => {
-        if ('name' in item && item.name.toLowerCase() !== filters.sector?.toLowerCase()) {
-          return { ...item, value: Math.floor(item.value * 0.5) };
-        }
-        return item;
-      });
-    }
-    
-    if (filters.country && mockData.length > 0 && 'country' in mockData[0]) {
-      // Reduce counts for non-matching countries
-      mockData = mockData.map(item => {
-        if (item.country.toLowerCase() !== filters.country?.toLowerCase()) {
-          return { ...item, count: Math.floor(item.count * 0.6) };
-        }
-        return item;
-      });
-    }
-    
-    // Simulate filtering effect on topic distribution
     if (filters.topic && endpoint === 'topic-distribution') {
-      mockData = mockData.map(item => {
-        if (item.name.toLowerCase() !== filters.topic?.toLowerCase()) {
-          return { ...item, value: Math.floor(item.value * 0.4) };
-        }
-        return item;
-      });
+      // Filter topics that include the filter text (case insensitive)
+      mockData = mockData.filter(item => 
+        item.name.toLowerCase().includes(filters.topic!.toLowerCase())
+      );
     }
     
-    // Simulate filtering on region
+    if (filters.sector) {
+      if (endpoint === 'sector-distribution') {
+        // Filter sectors that include the filter text
+        mockData = mockData.filter(item => 
+          item.name.toLowerCase().includes(filters.sector!.toLowerCase())
+        );
+      } else if (mockData.length > 0 && 'name' in mockData[0]) {
+        // Reduce counts for non-matching sectors
+        mockData = mockData.map(item => {
+          if ('name' in item && !item.name.toLowerCase().includes(filters.sector!.toLowerCase())) {
+            return { ...item, value: Math.floor(item.value * 0.5) };
+          }
+          return item;
+        });
+      }
+    }
+    
+    if (filters.country) {
+      if (endpoint === 'country-distribution') {
+        // Filter countries that include the filter text
+        mockData = mockData.filter(item => 
+          item.country.toLowerCase().includes(filters.country!.toLowerCase())
+        );
+      } else if (mockData.length > 0 && 'country' in mockData[0]) {
+        // Reduce counts for non-matching countries
+        mockData = mockData.map(item => {
+          if (!item.country.toLowerCase().includes(filters.country!.toLowerCase())) {
+            return { ...item, count: Math.floor(item.count * 0.6) };
+          }
+          return item;
+        });
+      }
+    }
+    
     if (filters.region && endpoint === 'region-distribution') {
-      mockData = mockData.map(item => {
-        if (item.name.toLowerCase() !== filters.region?.toLowerCase()) {
-          return { ...item, value: Math.floor(item.value * 0.3) };
-        }
-        return item;
-      });
+      // Filter regions that include the filter text
+      mockData = mockData.filter(item => 
+        item.name.toLowerCase().includes(filters.region!.toLowerCase())
+      );
+    }
+    
+    // Filter year trends by end_year if specified
+    if (filters.end_year && endpoint === 'year-trend') {
+      const year = parseInt(filters.end_year);
+      if (!isNaN(year)) {
+        mockData = mockData.filter(item => item.year <= year);
+      }
     }
   }
   

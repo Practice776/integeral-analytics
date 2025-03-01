@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import TopicChart from "../components/charts/TopicChart";
 import YearTrendsChart from "../components/charts/YearTrendsChart";
@@ -56,6 +55,7 @@ const Index = () => {
   
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [appliedFilters, setAppliedFilters] = useState<FilterParams>({});
 
   useEffect(() => {
     // Function to handle window resize
@@ -96,94 +96,80 @@ const Index = () => {
     countryFilter
   ]);
 
-  // Fetch data with filters
+  // Fetch data function with applied filters
+  const fetchDashboardData = useCallback(async (filters: FilterParams) => {
+    setIsLoading(true);
+    try {
+      console.log("Applying filters:", filters);
+
+      // Fetch all data with the filters applied
+      const [topics, yearTrends, intensities, likelihoods, regions, sectors, countries] = await Promise.all([
+        fetchTopicDistribution(filters),
+        fetchYearTrends(filters),
+        fetchIntensityDistribution(filters),
+        fetchLikelihoodDistribution(filters),
+        fetchRegionDistribution(filters),
+        fetchSectorDistribution(filters),
+        fetchCountryDistribution(filters)
+      ]);
+
+      // Set state with fetched data
+      setTopicData(topics);
+      setYearTrendData(yearTrends);
+      setIntensityData(intensities);
+      setLikelihoodData(likelihoods);
+      setRegionData(regions);
+      setSectorData(sectors);
+      setCountryData(countries);
+      
+      // Show success toast when filters are applied
+      if (Object.values(filters).some(f => f)) {
+        toast({
+          title: "Filters Applied",
+          description: "Dashboard data has been filtered successfully.",
+        });
+      }
+    } catch (error) {
+      console.error("Error loading dashboard data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard data. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  // Initial data load and when applied filters change
   useEffect(() => {
     let isMounted = true;
     
-    async function loadData() {
-      if (!isMounted) return;
-      
-      setIsLoading(true);
-      try {
-        // Using filters object to pass to API functions
-        const filters: FilterParams = {
-          end_year: endYearFilter,
-          topic: topicFilter,
-          sector: sectorFilter,
-          region: regionFilter,
-          pestle: pestleFilter,
-          source: sourceFilter,
-          swot: swotFilter,
-          country: countryFilter
-        };
-
-        console.log("Applying filters:", filters);
-
-        // Fetch all data with the filters applied
-        const [topics, yearTrends, intensities, likelihoods, regions, sectors, countries] = await Promise.all([
-          fetchTopicDistribution(filters),
-          fetchYearTrends(filters),
-          fetchIntensityDistribution(filters),
-          fetchLikelihoodDistribution(filters),
-          fetchRegionDistribution(filters),
-          fetchSectorDistribution(filters),
-          fetchCountryDistribution(filters)
-        ]);
-
-        if (!isMounted) return;
-
-        // Set state with fetched data
-        setTopicData(topics);
-        setYearTrendData(yearTrends);
-        setIntensityData(intensities);
-        setLikelihoodData(likelihoods);
-        setRegionData(regions);
-        setSectorData(sectors);
-        setCountryData(countries);
-        
-        // Show success toast when filters are applied
-        if (Object.values(filters).some(f => f)) {
-          toast({
-            title: "Filters Applied",
-            description: "Dashboard data has been filtered successfully.",
-          });
-        }
-      } catch (error) {
-        console.error("Error loading dashboard data:", error);
-        if (isMounted) {
-          toast({
-            title: "Error",
-            description: "Failed to load dashboard data. Please try again.",
-            variant: "destructive"
-          });
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
+    if (isMounted) {
+      fetchDashboardData(appliedFilters);
     }
-
-    loadData();
     
     return () => {
       isMounted = false;
     };
-  }, [
-    // Dependencies for filters
-    endYearFilter,
-    topicFilter,
-    sectorFilter,
-    regionFilter,
-    pestleFilter,
-    sourceFilter,
-    swotFilter,
-    countryFilter,
-    toast
-  ]);
+  }, [appliedFilters, fetchDashboardData]);
 
   const handleApplyFilters = () => {
-    // The useEffect will handle data fetching because the filter state variables are dependencies
+    // Create filters object with current filter values
+    const newFilters: FilterParams = {
+      end_year: endYearFilter,
+      topic: topicFilter,
+      sector: sectorFilter,
+      region: regionFilter,
+      pestle: pestleFilter,
+      source: sourceFilter,
+      swot: swotFilter,
+      country: countryFilter
+    };
+    
+    // Set the applied filters - this will trigger the useEffect to fetch data
+    setAppliedFilters(newFilters);
+    
     toast({
       title: "Applying filters...",
       description: "Updating dashboard data with the selected filters.",
@@ -191,6 +177,7 @@ const Index = () => {
   };
 
   const handleClearFilters = () => {
+    // Clear all filter state variables
     setEndYearFilter("");
     setTopicFilter("");
     setSectorFilter("");
@@ -199,6 +186,9 @@ const Index = () => {
     setSourceFilter("");
     setSwotFilter("");
     setCountryFilter("");
+    
+    // Clear applied filters - this will trigger a reload with no filters
+    setAppliedFilters({});
     
     toast({
       title: "Filters Cleared",

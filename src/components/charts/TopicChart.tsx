@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 
 interface TopicData {
@@ -14,6 +14,7 @@ interface TopicChartProps {
 
 const TopicChart: React.FC<TopicChartProps> = ({ data, height = 300 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
 
   useEffect(() => {
     if (!data || data.length === 0 || !svgRef.current) return;
@@ -81,7 +82,7 @@ const TopicChart: React.FC<TopicChartProps> = ({ data, height = 300 }) => {
       .attr('fill', 'currentColor')
       .attr('font-size', '0.75rem');
 
-    // Create color scale
+    // Create color scale with dynamic gradient based on data
     const colorScale = d3
       .scaleSequential()
       .domain([0, filteredData.length])
@@ -120,6 +121,8 @@ const TopicChart: React.FC<TopicChartProps> = ({ data, height = 300 }) => {
       .attr('fill', (d, i) => colorScale(i))
       .attr('rx', 4) // Rounded corners
       .attr('ry', 4)
+      .attr('stroke', (d) => d.name === selectedTopic ? '#000' : 'none')
+      .attr('stroke-width', (d) => d.name === selectedTopic ? 2 : 0)
       .on('mouseover', (event, d) => {
         // Highlight the bar
         d3.select(event.currentTarget)
@@ -142,18 +145,30 @@ const TopicChart: React.FC<TopicChartProps> = ({ data, height = 300 }) => {
           .style('left', `${event.pageX + 10}px`)
           .style('top', `${event.pageY - 28}px`);
       })
-      .on('mouseout', (event) => {
-        // Restore bar appearance
+      .on('mouseout', (event, d) => {
+        // Restore bar appearance unless it's selected
         d3.select(event.currentTarget)
           .transition()
           .duration(200)
           .attr('opacity', 1)
-          .attr('stroke', 'none');
+          .attr('stroke', d.name === selectedTopic ? '#000' : 'none')
+          .attr('stroke-width', d.name === selectedTopic ? 2 : 0);
           
         tooltip
           .transition()
           .duration(500)
           .style('opacity', 0);
+      })
+      .on('click', (event, d) => {
+        // Toggle selection state
+        setSelectedTopic(prev => prev === d.name ? null : d.name);
+        
+        // Update all bars to reflect selection state
+        svg.selectAll('.bar')
+          .transition()
+          .duration(300)
+          .attr('stroke', (barData: any) => barData.name === d.name ? '#000' : 'none')
+          .attr('stroke-width', (barData: any) => barData.name === d.name ? 2 : 0);
       })
       .transition()
       .duration(800)
@@ -184,11 +199,22 @@ const TopicChart: React.FC<TopicChartProps> = ({ data, height = 300 }) => {
     return () => {
       tooltip.remove();
     };
-  }, [data, height]);
+  }, [data, height, selectedTopic]);
 
   return (
     <div className="w-full h-full overflow-hidden">
       <svg ref={svgRef} className="w-full h-full"></svg>
+      {selectedTopic && (
+        <div className="text-sm mt-2 text-center p-1 bg-blue-50 rounded">
+          Selected: <span className="font-medium">{selectedTopic}</span>
+          <button 
+            className="ml-2 text-xs text-blue-600 hover:text-blue-800"
+            onClick={() => setSelectedTopic(null)}
+          >
+            Clear
+          </button>
+        </div>
+      )}
     </div>
   );
 };
