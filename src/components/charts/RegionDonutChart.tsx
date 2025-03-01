@@ -1,11 +1,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
-
-interface RegionData {
-  name: string;
-  value: number;
-}
+import { RegionData } from '../../services/api';
 
 interface RegionDonutChartProps {
   data: RegionData[];
@@ -21,41 +17,39 @@ const RegionDonutChart: React.FC<RegionDonutChartProps> = ({ data, height = 300 
     // Clear previous chart
     d3.select(svgRef.current).selectAll('*').remove();
 
-    // Set dimensions
-    const width = svgRef.current.clientWidth;
-    const chartHeight = height;
-    const radius = Math.min(width, chartHeight) / 2 * 0.8;
+    // Set dimensions and margins
+    const margin = { top: 30, right: 30, bottom: 30, left: 30 };
+    const width = svgRef.current.clientWidth - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+    const radius = Math.min(width, chartHeight) / 2;
 
     // Create svg
     const svg = d3
       .select(svgRef.current)
-      .attr('width', width)
-      .attr('height', chartHeight)
+      .attr('width', width + margin.left + margin.right)
+      .attr('height', chartHeight + margin.top + margin.bottom)
       .append('g')
-      .attr('transform', `translate(${width / 2},${chartHeight / 2})`);
+      .attr('transform', `translate(${width / 2 + margin.left},${chartHeight / 2 + margin.top})`);
 
     // Create color scale
-    const color = d3.scaleOrdinal(d3.schemeBlues[Math.max(9, data.length)]);
+    const color = d3.scaleOrdinal(d3.schemeCategory10);
 
-    // Compute the position of each group on the pie
+    // Create pie generator
     const pie = d3
       .pie<RegionData>()
-      .sort(null)
-      .value(d => d.value);
+      .value(d => d.value)
+      .sort(null);
 
-    const data_ready = pie(data);
-
-    // Create the arcs
+    // Create arc generators
     const arc = d3
       .arc<d3.PieArcDatum<RegionData>>()
-      .innerRadius(radius * 0.5) // This creates the donut effect
+      .innerRadius(radius * 0.4)
       .outerRadius(radius);
 
-    // Create the hover arc with a slightly larger radius
-    const arcHover = d3
+    const labelArc = d3
       .arc<d3.PieArcDatum<RegionData>>()
-      .innerRadius(radius * 0.5)
-      .outerRadius(radius * 1.1);
+      .innerRadius(radius * 0.7)
+      .outerRadius(radius * 0.7);
 
     // Create tooltip
     const tooltip = d3
@@ -65,50 +59,46 @@ const RegionDonutChart: React.FC<RegionDonutChartProps> = ({ data, height = 300 
       .style('position', 'absolute')
       .style('opacity', 0);
 
-    // Calculate total for percentage
-    const total = d3.sum(data, d => d.value);
+    // Generate pie data
+    const pieData = pie(data);
 
-    // Build the donut chart with animations
-    svg
-      .selectAll('path')
-      .data(data_ready)
+    // Add slices with animation
+    const slices = svg
+      .selectAll('.slice')
+      .data(pieData)
       .enter()
+      .append('g')
+      .attr('class', 'slice');
+
+    slices
       .append('path')
-      .attr('d', arc)
+      .attr('d', d => arc(d) as string)
       .attr('fill', (d, i) => color(i.toString()) as string)
       .attr('stroke', 'white')
       .style('stroke-width', '2px')
       .style('opacity', 0.8)
-      .on('mouseover', function(event, d) {
-        const percentage = ((d.data.value / total) * 100).toFixed(1);
-        
-        // Highlight the segment
-        d3.select(this)
+      .on('mouseover', (event, d) => {
+        d3.select(event.currentTarget)
           .transition()
           .duration(200)
-          .attr('d', arcHover)
           .style('opacity', 1);
-        
-        // Show tooltip
+
         tooltip
           .style('opacity', 1)
           .html(`<div class="p-2">
                   <div class="font-medium">${d.data.name}</div>
                   <div>Count: ${d.data.value}</div>
-                  <div>${percentage}% of total</div>
+                  <div>Percent: ${(d.data.value / d3.sum(data, d => d.value) * 100).toFixed(1)}%</div>
                 </div>`)
           .style('left', `${event.pageX + 10}px`)
           .style('top', `${event.pageY - 28}px`);
       })
-      .on('mouseout', function() {
-        // Return to normal
-        d3.select(this)
+      .on('mouseout', event => {
+        d3.select(event.currentTarget)
           .transition()
           .duration(200)
-          .attr('d', arc)
           .style('opacity', 0.8);
         
-        // Hide tooltip
         tooltip.style('opacity', 0);
       })
       .transition()
@@ -116,72 +106,53 @@ const RegionDonutChart: React.FC<RegionDonutChartProps> = ({ data, height = 300 
       .attrTween('d', function(d) {
         const interpolate = d3.interpolate({ startAngle: 0, endAngle: 0 }, d);
         return function(t) {
-          return arc(interpolate(t));
+          return arc(interpolate(t)) as string;
         };
       });
 
-    // Add center text
-    svg
+    // Add labels for larger slices
+    slices
+      .filter(d => (d.endAngle - d.startAngle) > 0.25)
       .append('text')
-      .attr('text-anchor', 'middle')
+      .attr('transform', d => `translate(${labelArc.centroid(d)})`)
       .attr('dy', '0.35em')
-      .attr('font-size', '1.2rem')
-      .attr('font-weight', 'bold')
-      .attr('fill', 'currentColor')
+      .attr('text-anchor', 'middle')
+      .attr('fill', 'white')
+      .style('font-size', '0.7rem')
+      .style('font-weight', 'bold')
       .style('opacity', 0)
-      .text('Regions')
+      .text(d => d.data.name.substring(0, 10) + (d.data.name.length > 10 ? '...' : ''))
       .transition()
       .delay(800)
       .duration(500)
       .style('opacity', 1);
 
-    // Add legend
-    const legendRectSize = 12;
-    const legendSpacing = 4;
-    const legendHeight = legendRectSize + legendSpacing;
-    
-    // Only show top 6 regions in legend to avoid clutter
-    const legendData = [...data]
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 6);
-    
+    // Add a legend
     const legend = svg
+      .append('g')
+      .attr('transform', `translate(${radius + 10}, ${-radius})`)
       .selectAll('.legend')
-      .data(legendData)
+      .data(pieData)
       .enter()
       .append('g')
       .attr('class', 'legend')
-      .attr('transform', (d, i) => {
-        const height = legendHeight + 5;
-        const offset = height * legendData.length / 2;
-        const x = radius + 20;
-        const y = (i * height) - offset;
-        return `translate(${x},${y})`;
-      })
-      .style('opacity', 0)
-      .transition()
-      .delay((d, i) => 800 + i * 100)
-      .duration(500)
-      .style('opacity', 1);
+      .attr('transform', (d, i) => `translate(0, ${i * 20})`);
 
     legend
       .append('rect')
-      .attr('width', legendRectSize)
-      .attr('height', legendRectSize)
-      .style('fill', (d, i) => color(i.toString()) as string)
-      .style('stroke', (d, i) => color(i.toString()) as string);
+      .attr('width', 10)
+      .attr('height', 10)
+      .attr('fill', (d, i) => color(i.toString()) as string);
 
     legend
       .append('text')
-      .attr('x', legendRectSize + legendSpacing)
-      .attr('y', legendRectSize - legendSpacing)
-      .style('font-size', '10px')
-      .style('fill', 'currentColor')
+      .attr('x', 15)
+      .attr('y', 10)
+      .attr('text-anchor', 'start')
+      .style('font-size', '0.7rem')
       .text(d => {
-        if (d.name.length > 15) {
-          return d.name.substring(0, 15) + '...';
-        }
-        return d.name;
+        const name = d.data.name;
+        return name.length > 15 ? name.substring(0, 15) + '...' : name;
       });
 
     // Clean up function

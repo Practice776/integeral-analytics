@@ -1,13 +1,15 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import TopicChart from "../components/charts/TopicChart";
 import YearTrendsChart from "../components/charts/YearTrendsChart";
+import IntensityChart from "../components/charts/IntensityChart";
+import LikelihoodChart from "../components/charts/LikelihoodChart";
+import RegionDonutChart from "../components/charts/RegionDonutChart";
+import SectorPieChart from "../components/charts/SectorPieChart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Filter, Gauge, BarChart3, TrendingUp, Database, Globe, Activity } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 
 // Import API service
@@ -309,10 +311,7 @@ const Index = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="h-[350px]">
-                      {/* Placeholder for IntensityChart */}
-                      <div className="flex justify-center items-center h-full text-gray-500">
-                        Intensity Chart - Mock Data Loaded
-                      </div>
+                      <IntensityChart data={intensityData} height={350} />
                     </div>
                   </CardContent>
                 </Card>
@@ -329,10 +328,7 @@ const Index = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="h-[350px]">
-                      {/* Placeholder for LikelihoodChart */}
-                      <div className="flex justify-center items-center h-full text-gray-500">
-                        Likelihood Chart - Mock Data Loaded
-                      </div>
+                      <LikelihoodChart data={likelihoodData} height={350} />
                     </div>
                   </CardContent>
                 </Card>
@@ -349,10 +345,7 @@ const Index = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="h-[350px]">
-                      {/* Placeholder for RegionChart */}
-                      <div className="flex justify-center items-center h-full text-gray-500">
-                        Region Chart - Mock Data Loaded
-                      </div>
+                      <RegionDonutChart data={regionData} height={350} />
                     </div>
                   </CardContent>
                 </Card>
@@ -369,10 +362,7 @@ const Index = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="h-[350px]">
-                      {/* Placeholder for SectorChart */}
-                      <div className="flex justify-center items-center h-full text-gray-500">
-                        Sector Chart - Mock Data Loaded
-                      </div>
+                      <SectorPieChart data={sectorData} height={350} />
                     </div>
                   </CardContent>
                 </Card>

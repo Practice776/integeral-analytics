@@ -1,6 +1,7 @@
+
 import { toast } from 'sonner';
 
-// API base URL - change this to point to your Flask backend
+// API base URL - point to your Flask backend
 const API_BASE_URL = 'http://localhost:5000/api';
 
 // Types for our data
@@ -38,6 +39,11 @@ export interface YearTrendData {
   year: number;
   avgIntensity: number;
   avgLikelihood: number;
+  avgRelevance: number;
+}
+
+export interface RelevanceData {
+  topic: string;
   avgRelevance: number;
 }
 
@@ -84,7 +90,14 @@ const handleApiError = (error: unknown, endpoint: string) => {
 // Function to fetch data with proper error handling
 const fetchData = async <T>(endpoint: string, filters: FilterParams = {}): Promise<T> => {
   try {
-    const response = await fetch(buildUrl(endpoint, filters));
+    const response = await fetch(buildUrl(endpoint, filters), {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      // If you have auth, uncomment this:
+      // credentials: 'include',
+    });
     
     if (!response.ok) {
       throw new Error(`Server returned ${response.status}: ${response.statusText}`);
@@ -217,6 +230,10 @@ export const fetchYearTrends = (filters = {}): Promise<YearTrendData[]> => {
   return fetchData<YearTrendData[]>('year-trend', filters);
 };
 
+export const fetchRelevanceChart = (filters = {}): Promise<RelevanceData[]> => {
+  return fetchData<RelevanceData[]>('relevance-chart', filters);
+};
+
 export const fetchDashboardStats = (filters = {}): Promise<DashboardStats> => {
   try {
     return fetchData<DashboardStats>('dashboard-stats', filters);
@@ -237,7 +254,12 @@ export const fetchDashboardStats = (filters = {}): Promise<DashboardStats> => {
 // Function to handle general data filtering
 export const filterData = async (filters = {}): Promise<any[]> => {
   try {
-    const response = await fetch(buildUrl('filter', filters));
+    const response = await fetch(buildUrl('filter', filters), {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
     
     if (!response.ok) {
       throw new Error(`Server returned ${response.status}: ${response.statusText}`);
@@ -247,6 +269,36 @@ export const filterData = async (filters = {}): Promise<any[]> => {
   } catch (error) {
     console.error('Error filtering data:', error);
     toast.error('Failed to apply filters');
+    return [];
+  }
+};
+
+// Function to get paginated data (requires authentication)
+export const getPaginatedData = async (page = 1, limit = 10): Promise<any[]> => {
+  try {
+    const url = new URL(`${API_BASE_URL}/data`);
+    url.searchParams.append('page', page.toString());
+    url.searchParams.append('limit', limit.toString());
+    
+    // This endpoint requires authentication
+    const response = await fetch(url.toString(), {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        // You would need to include your auth token here
+        // 'Authorization': `Bearer ${token}`
+      },
+      credentials: 'include',
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching paginated data:', error);
+    toast.error('Failed to load data - authentication may be required');
     return [];
   }
 };
