@@ -62,7 +62,7 @@
   }
 
   .d3-chart .grid line {
-    @apply stroke-border stroke-opacity-50;
+    @apply stroke-border opacity-50;
   }
 
   /* Additional Utility Classes */
